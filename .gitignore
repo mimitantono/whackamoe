@@ -1,0 +1,62 @@
+# ── Credentials & signing ──────────────────────────────────────────────────────
+android/key.properties
+*.jks
+*.keystore
+keystore.pass
+
+# ── Flutter / Dart / Pub ───────────────────────────────────────────────────────
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+**/doc/api/
+
+# ── Build output ───────────────────────────────────────────────────────────────
+build/
+/android/app/debug
+/android/app/profile
+/android/app/release
+**/ios/Flutter/.last_build_id
+app.*.symbols
+app.*.map.json
+
+# ── Android ────────────────────────────────────────────────────────────────────
+android/local.properties
+android/.gradle/
+**/android/**/GeneratedPluginRegistrant.java
+
+# ── iOS / macOS ────────────────────────────────────────────────────────────────
+**/ios/**/*.mode1v3
+**/ios/**/*.mode2v3
+**/ios/**/*.perspectivev3
+**/ios/**/*.xcworkspace
+**/ios/Flutter/App.framework
+**/ios/Flutter/Flutter.framework
+**/ios/Flutter/Flutter.podspec
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/ephemeral/
+**/ios/Flutter/app.flx
+**/ios/Flutter/app.zip
+**/ios/Flutter/flutter_assets/
+**/ios/ServiceDefinitions.json
+**/ios/Runner/GeneratedPluginRegistrant.*
+**/macos/Flutter/GeneratedPluginRegistrant.swift
+**/macos/Flutter/ephemeral/
+
+# ── IDEs ───────────────────────────────────────────────────────────────────────
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+
+# ── OS & editor noise ──────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.log
+*.swp
+*.class
+
+# ── Claude Code internal ───────────────────────────────────────────────────────
+.claude/
