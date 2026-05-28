@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/difficulty.dart';
 import '../models/game_state.dart';
+import '../services/sound_service.dart';
 import '../widgets/hole_widget.dart';
 
 // ── Floating popup (score or broken heart) ────────────────────────────────────
@@ -58,6 +59,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   bool _started = false;
   int _highScore = 0;
 
+  late final SoundService _sounds;
   final List<_Popup> _popups = [];
 
   // GlobalKey per hole so we can look up each hole's screen position.
@@ -70,6 +72,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    _sounds = SoundService();
+    _sounds.init().then((_) { if (mounted) setState(() {}); });
     _resetHoleState();
     _loadHighScore();
   }
@@ -171,6 +175,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         _holeCooldownTimers[index] = Timer(const Duration(milliseconds: 750), () {
           _holeCoolingDown[index] = false;
         });
+        _sounds.playMiss();
         _showPopup(index: index, label: '💨', color: Colors.white60);
       }
     } else {
@@ -221,6 +226,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       _holeAppearTimes[index] = null;
       final newScore = _state.score + points;
       setState(() => _state = _state.copyWith(holes: newHoles, score: newScore));
+      _sounds.playWhack();
       _showPopup(
         index: index,
         label: '+$points',
@@ -233,6 +239,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       final newHp = (_state.hp - 2).clamp(0, GameState.maxHp);
       final gameOver = newHp <= 0;
       setState(() => _state = _state.copyWith(holes: newHoles, hp: newHp, isGameOver: gameOver));
+      _sounds.playHedgehog();
       _showPopup(index: index, label: '💔', color: Colors.red);
       _shakeControllers[index].forward(from: 0);
       if (gameOver) {
@@ -296,6 +303,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     for (final t in _holeTimers) { t?.cancel(); }
     for (final t in _holeCooldownTimers) { t?.cancel(); }
     for (final c in _shakeControllers) { c.dispose(); }
+    _sounds.dispose();
     super.dispose();
   }
 
@@ -345,7 +353,13 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                                 holeKeys: _holeKeys,
                                 onTap: _onHoleTap,
                               )
-                            : _StartPrompt(onStart: _startGame),
+                            : _StartPrompt(
+                                onStart: _startGame,
+                                hasCustomImage: _customImageBytes != null,
+                                onPickImage: _pickImage,
+                                muted: _sounds.muted,
+                                onToggleMute: () { _sounds.toggleMute(); setState(() {}); },
+                              ),
                         // Floating popups anchored to their hole.
                         for (final popup in _popups)
                           AnimatedBuilder(
@@ -373,8 +387,6 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  _UploadButton(hasCustom: _customImageBytes != null, onTap: _pickImage),
                   const SizedBox(height: 12),
                 ],
               ),
@@ -532,7 +544,18 @@ class _HoleGrid extends StatelessWidget {
 
 class _StartPrompt extends StatelessWidget {
   final VoidCallback onStart;
-  const _StartPrompt({required this.onStart});
+  final bool hasCustomImage;
+  final VoidCallback onPickImage;
+  final bool muted;
+  final VoidCallback onToggleMute;
+
+  const _StartPrompt({
+    required this.onStart,
+    required this.hasCustomImage,
+    required this.onPickImage,
+    required this.muted,
+    required this.onToggleMute,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -540,19 +563,52 @@ class _StartPrompt extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         const Text('🦔', style: TextStyle(fontSize: 72)),
-        const SizedBox(height: 24),
+        const SizedBox(height: 20),
         const Text(
           'Whack the moe!\nDon\'t hit the hedgehog!',
           textAlign: TextAlign.center,
           style: TextStyle(color: Colors.white70, fontSize: 18, height: 1.5),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         const Text(
           'Hit fast for +3  •  slow for +1',
           textAlign: TextAlign.center,
           style: TextStyle(color: Colors.white38, fontSize: 13),
         ),
-        const SizedBox(height: 36),
+        const SizedBox(height: 24),
+        _UploadButton(hasCustom: hasCustomImage, onTap: onPickImage),
+        const SizedBox(height: 12),
+        GestureDetector(
+          onTap: onToggleMute,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A1A2E),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFF3A3A5E)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  muted ? Icons.volume_off : Icons.volume_up,
+                  color: Colors.white54,
+                  size: 18,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  muted ? 'Sound off' : 'Sound on',
+                  style: const TextStyle(
+                    color: Colors.white54,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 28),
         SizedBox(
           width: 200, height: 54,
           child: ElevatedButton(
