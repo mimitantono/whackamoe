@@ -31,6 +31,22 @@ jobs:
       - name: Build web
         run: flutter build web --release --pwa-strategy=none --base-href "/${{ github.event.repository.name }}/"
 
+      - name: Inject kill-switch service worker
+        run: |
+          cat > build/web/flutter_service_worker.js << 'EOF'
+          // Replaces the old caching service worker.
+          // Installs immediately, wipes all caches, then unregisters itself.
+          self.addEventListener('install', () => self.skipWaiting());
+          self.addEventListener('activate', event => {
+            event.waitUntil(
+              caches.keys()
+                .then(keys => Promise.all(keys.map(k => caches.delete(k))))
+                .then(() => self.clients.claim())
+                .then(() => self.registration.unregister())
+            );
+          });
+          EOF
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: build/web
