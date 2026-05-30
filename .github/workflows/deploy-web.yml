@@ -31,6 +31,10 @@ jobs:
       - name: Build web
         run: flutter build web --release --pwa-strategy=none --base-href "/${{ github.event.repository.name }}/"
 
+      - name: Version-stamp bootstrap reference
+        run: |
+          sed -i "s|flutter_bootstrap.js\"|flutter_bootstrap.js?v=${{ github.run_number }}\"|g" build/web/index.html
+
       - name: Inject kill-switch service worker
         run: |
           cat > build/web/flutter_service_worker.js << 'EOF'
