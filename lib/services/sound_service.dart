@@ -4,30 +4,41 @@ import 'package:shared_preferences/shared_preferences.dart';
 class SoundService {
   static const _muteKey = 'whackamoe_muted';
 
-  final AudioPlayer _whackPlayer = AudioPlayer();
-  final AudioPlayer _missPlayer = AudioPlayer();
-  final AudioPlayer _hedgehogPlayer = AudioPlayer();
+  // Two players per sound so rapid re-triggers never block on each other.
+  final _whackPool    = [AudioPlayer(), AudioPlayer()];
+  final _missPool     = [AudioPlayer(), AudioPlayer()];
+  final _hedgehogPool = [AudioPlayer(), AudioPlayer()];
+  int _wi = 0, _mi = 0, _hi = 0;
 
   bool _muted = true;
   bool get muted => _muted;
 
-  SoundService() {
-    for (final p in [_whackPlayer, _missPlayer, _hedgehogPlayer]) {
-      p.setReleaseMode(ReleaseMode.stop);
-    }
-  }
-
-  // Loads mute preference and pre-decodes all audio so the first tap has no delay.
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
     _muted = prefs.getBool(_muteKey) ?? true;
 
-    // Pre-load: decode into native buffer now; play() will seek+resume instantly.
+    for (final p in [..._whackPool, ..._missPool, ..._hedgehogPool]) {
+      p.setReleaseMode(ReleaseMode.stop);
+    }
     await Future.wait([
-      _whackPlayer.setSource(AssetSource('sounds/whack.mp3')),
-      _missPlayer.setSource(AssetSource('sounds/miss.mp3')),
-      _hedgehogPlayer.setSource(AssetSource('sounds/hedgehog.mp3')),
+      ..._whackPool.map((p)    => p.setSource(AssetSource('sounds/whack.ogg'))),
+      ..._missPool.map((p)     => p.setSource(AssetSource('sounds/miss.ogg'))),
+      ..._hedgehogPool.map((p) => p.setSource(AssetSource('sounds/hedgehog.ogg'))),
     ]);
+  }
+
+  // Call inside the PLAY button gesture to unlock the Web Audio AudioContext
+  // and exercise every player so none are cold on first real use.
+  Future<void> warmUp() async {
+    if (_muted) return;
+    try {
+      for (final p in [..._whackPool, ..._missPool, ..._hedgehogPool]) {
+        await p.setVolume(0);
+        await p.resume();
+        await p.stop();
+        await p.setVolume(1);
+      }
+    } catch (_) {}
   }
 
   void toggleMute() {
@@ -35,19 +46,27 @@ class SoundService {
     SharedPreferences.getInstance().then((p) => p.setBool(_muteKey, _muted));
   }
 
-  void playWhack()    => _play(_whackPlayer);
-  void playMiss()     => _play(_missPlayer);
-  void playHedgehog() => _play(_hedgehogPlayer);
-
-  void _play(AudioPlayer player) {
+  void playWhack() {
     if (_muted) return;
-    // Seek to start then resume — no re-decode needed, fires immediately.
-    player.seek(Duration.zero).then((_) => player.resume());
+    _wi = (_wi + 1) % _whackPool.length;
+    _whackPool[_wi].play(AssetSource('sounds/whack.ogg'));
+  }
+
+  void playMiss() {
+    if (_muted) return;
+    _mi = (_mi + 1) % _missPool.length;
+    _missPool[_mi].play(AssetSource('sounds/miss.ogg'));
+  }
+
+  void playHedgehog() {
+    if (_muted) return;
+    _hi = (_hi + 1) % _hedgehogPool.length;
+    _hedgehogPool[_hi].play(AssetSource('sounds/hedgehog.ogg'));
   }
 
   void dispose() {
-    _whackPlayer.dispose();
-    _missPlayer.dispose();
-    _hedgehogPlayer.dispose();
+    for (final p in [..._whackPool, ..._missPool, ..._hedgehogPool]) {
+      p.dispose();
+    }
   }
 }
