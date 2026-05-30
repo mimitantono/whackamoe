@@ -17,9 +17,17 @@ class SoundService {
     }
   }
 
+  // Loads mute preference and pre-decodes all audio so the first tap has no delay.
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
     _muted = prefs.getBool(_muteKey) ?? true;
+
+    // Pre-load: decode into native buffer now; play() will seek+resume instantly.
+    await Future.wait([
+      _whackPlayer.setSource(AssetSource('sounds/whack.mp3')),
+      _missPlayer.setSource(AssetSource('sounds/miss.mp3')),
+      _hedgehogPlayer.setSource(AssetSource('sounds/hedgehog.mp3')),
+    ]);
   }
 
   void toggleMute() {
@@ -27,9 +35,15 @@ class SoundService {
     SharedPreferences.getInstance().then((p) => p.setBool(_muteKey, _muted));
   }
 
-  void playWhack()    { if (!_muted) _whackPlayer.play(AssetSource('sounds/whack.mp3')); }
-  void playMiss()     { if (!_muted) _missPlayer.play(AssetSource('sounds/miss.mp3')); }
-  void playHedgehog() { if (!_muted) _hedgehogPlayer.play(AssetSource('sounds/hedgehog.mp3')); }
+  void playWhack()    => _play(_whackPlayer);
+  void playMiss()     => _play(_missPlayer);
+  void playHedgehog() => _play(_hedgehogPlayer);
+
+  void _play(AudioPlayer player) {
+    if (_muted) return;
+    // Seek to start then resume — no re-decode needed, fires immediately.
+    player.seek(Duration.zero).then((_) => player.resume());
+  }
 
   void dispose() {
     _whackPlayer.dispose();
