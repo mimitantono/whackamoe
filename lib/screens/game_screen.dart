@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/difficulty.dart';
 import '../models/game_state.dart';
+import '../services/segmentation_service.dart';
 import '../services/sound_service.dart';
 import '../widgets/hole_widget.dart';
 
@@ -56,6 +57,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   List<bool> _holeCoolingDown = [];
   List<Timer?> _holeCooldownTimers = [];
   Uint8List? _customImageBytes;
+  bool _customImageIsSegmented = false;
+  bool _isSegmenting = false;
   bool _started = false;
   int _highScore = 0;
 
@@ -294,7 +297,15 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     final file = await picker.pickImage(source: ImageSource.gallery, maxWidth: 512, maxHeight: 512);
     if (file == null) return;
     final bytes = await file.readAsBytes();
-    setState(() => _customImageBytes = bytes);
+    setState(() => _isSegmenting = true);
+    final result = await SegmentationService.removeBackground(bytes);
+    if (mounted) {
+      setState(() {
+        _customImageBytes = result.bytes;
+        _customImageIsSegmented = result.hasTransparency;
+        _isSegmenting = false;
+      });
+    }
   }
 
   @override
@@ -349,6 +360,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                                 difficulty: widget.difficulty,
                                 holes: _state.holes,
                                 customImageBytes: _customImageBytes,
+                                customImageIsSegmented: _customImageIsSegmented,
                                 shakeAnims: _shakeAnims,
                                 holeKeys: _holeKeys,
                                 onTap: _onHoleTap,
@@ -356,6 +368,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                             : _StartPrompt(
                                 onStart: _startGame,
                                 hasCustomImage: _customImageBytes != null,
+                                isSegmented: _customImageIsSegmented,
+                                isSegmenting: _isSegmenting,
                                 onPickImage: _pickImage,
                                 muted: _sounds.muted,
                                 onToggleMute: () { _sounds.toggleMute(); setState(() {}); },
@@ -478,6 +492,7 @@ class _HoleGrid extends StatelessWidget {
   final Difficulty difficulty;
   final List<HoleContent> holes;
   final Uint8List? customImageBytes;
+  final bool customImageIsSegmented;
   final List<Animation<double>> shakeAnims;
   final List<GlobalKey> holeKeys;
   final void Function(int, HoleContent) onTap;
@@ -486,6 +501,7 @@ class _HoleGrid extends StatelessWidget {
     required this.difficulty,
     required this.holes,
     required this.customImageBytes,
+    required this.customImageIsSegmented,
     required this.shakeAnims,
     required this.holeKeys,
     required this.onTap,
@@ -531,6 +547,7 @@ class _HoleGrid extends StatelessWidget {
               key: ValueKey(index),
               content: holes[index],
               customImageBytes: customImageBytes,
+              customImageIsSegmented: customImageIsSegmented,
               onTap: (content) => onTap(index, content),
             ),
           ),
@@ -545,6 +562,8 @@ class _HoleGrid extends StatelessWidget {
 class _StartPrompt extends StatelessWidget {
   final VoidCallback onStart;
   final bool hasCustomImage;
+  final bool isSegmented;
+  final bool isSegmenting;
   final VoidCallback onPickImage;
   final bool muted;
   final VoidCallback onToggleMute;
@@ -552,6 +571,8 @@ class _StartPrompt extends StatelessWidget {
   const _StartPrompt({
     required this.onStart,
     required this.hasCustomImage,
+    required this.isSegmented,
+    required this.isSegmenting,
     required this.onPickImage,
     required this.muted,
     required this.onToggleMute,
@@ -576,7 +597,12 @@ class _StartPrompt extends StatelessWidget {
           style: TextStyle(color: Colors.white38, fontSize: 13),
         ),
         const SizedBox(height: 24),
-        _UploadButton(hasCustom: hasCustomImage, onTap: onPickImage),
+        _UploadButton(
+          hasCustom: hasCustomImage,
+          isSegmented: isSegmented,
+          isSegmenting: isSegmenting,
+          onTap: onPickImage,
+        ),
         const SizedBox(height: 12),
         GestureDetector(
           onTap: onToggleMute,
@@ -630,36 +656,66 @@ class _StartPrompt extends StatelessWidget {
 
 class _UploadButton extends StatelessWidget {
   final bool hasCustom;
+  final bool isSegmented;
+  final bool isSegmenting;
   final VoidCallback onTap;
-  const _UploadButton({required this.hasCustom, required this.onTap});
+  const _UploadButton({
+    required this.hasCustom,
+    required this.isSegmented,
+    required this.isSegmenting,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final Color borderColor;
+    final Color contentColor;
+    final Widget leading;
+    final String label;
+
+    if (isSegmenting) {
+      borderColor = const Color(0xFF3A3A5E);
+      contentColor = Colors.white54;
+      leading = const SizedBox(
+        width: 18,
+        height: 18,
+        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white54),
+      );
+      label = 'Removing background…';
+    } else if (hasCustom && isSegmented) {
+      borderColor = Colors.greenAccent;
+      contentColor = Colors.greenAccent;
+      leading = const Icon(Icons.auto_awesome, color: Colors.greenAccent, size: 18);
+      label = 'Custom nemesis (smart crop)';
+    } else if (hasCustom) {
+      borderColor = Colors.amber;
+      contentColor = Colors.amber;
+      leading = const Icon(Icons.check_circle, color: Colors.amber, size: 18);
+      label = 'Custom nemesis set!';
+    } else {
+      borderColor = const Color(0xFF3A3A5E);
+      contentColor = Colors.white54;
+      leading = const Icon(Icons.upload_rounded, color: Colors.white54, size: 18);
+      label = 'Upload your nemesis';
+    }
+
     return GestureDetector(
-      onTap: onTap,
+      onTap: isSegmenting ? null : onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
         decoration: BoxDecoration(
           color: const Color(0xFF1A1A2E),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: hasCustom ? Colors.amber : const Color(0xFF3A3A5E),
-            width: hasCustom ? 2 : 1,
-          ),
+          border: Border.all(color: borderColor, width: hasCustom ? 2 : 1),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(hasCustom ? Icons.check_circle : Icons.upload_rounded,
-                color: hasCustom ? Colors.amber : Colors.white54, size: 18),
+            leading,
             const SizedBox(width: 8),
             Text(
-              hasCustom ? 'Custom nemesis set!' : 'Upload your nemesis',
-              style: TextStyle(
-                color: hasCustom ? Colors.amber : Colors.white54,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
+              label,
+              style: TextStyle(color: contentColor, fontSize: 13, fontWeight: FontWeight.w600),
             ),
           ],
         ),

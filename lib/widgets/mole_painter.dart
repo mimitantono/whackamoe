@@ -189,6 +189,7 @@ class HedgehogPainter extends CustomPainter {
 class HoleCharacter extends StatelessWidget {
   final bool isMole;
   final Uint8List? customImageBytes;
+  final bool customImageIsSegmented;
   final double size;
 
   const HoleCharacter({
@@ -196,6 +197,7 @@ class HoleCharacter extends StatelessWidget {
     required this.isMole,
     required this.size,
     this.customImageBytes,
+    this.customImageIsSegmented = false,
   });
 
   @override
@@ -207,14 +209,19 @@ class HoleCharacter extends StatelessWidget {
       );
     }
     if (customImageBytes != null) {
-      return ClipOval(
-        child: Image.memory(
-          customImageBytes!,
-          width: size,
-          height: size,
-          fit: BoxFit.cover,
-        ),
+      final image = Image.memory(
+        customImageBytes!,
+        width: size,
+        height: size,
+        fit: BoxFit.contain,
       );
+      // Segmented images already have a transparent background — no circular clip needed.
+      return customImageIsSegmented ? image : ClipOval(child: Image.memory(
+        customImageBytes!,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+      ));
     }
     return CustomPaint(
       size: Size(size, size),

@@ -6,6 +6,7 @@ import 'mole_painter.dart';
 class HoleWidget extends StatefulWidget {
   final HoleContent content;
   final Uint8List? customImageBytes;
+  final bool customImageIsSegmented;
   final void Function(HoleContent) onTap;
 
   const HoleWidget({
@@ -13,6 +14,7 @@ class HoleWidget extends StatefulWidget {
     required this.content,
     required this.onTap,
     this.customImageBytes,
+    this.customImageIsSegmented = false,
   });
 
   @override
@@ -112,6 +114,7 @@ class _HoleWidgetState extends State<HoleWidget>
                         child: HoleCharacter(
                           isMole: _displayed == HoleContent.mole,
                           customImageBytes: widget.customImageBytes,
+                          customImageIsSegmented: widget.customImageIsSegmented,
                           size: charSize,
                         ),
                       ),
