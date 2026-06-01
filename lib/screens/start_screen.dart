@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/difficulty.dart';
+import '../services/interest_service.dart';
 import 'game_screen.dart';
 
 class StartScreen extends StatefulWidget {
@@ -15,11 +16,16 @@ class _StartScreenState extends State<StartScreen> {
   final Map<Difficulty, int> _bestScores = {
     for (final d in Difficulty.values) d: 0,
   };
+  bool _interestRegistered = false;
+  bool _interestLoading = false;
 
   @override
   void initState() {
     super.initState();
     _loadBestScores();
+    InterestService.hasRegistered().then((v) {
+      if (mounted) setState(() => _interestRegistered = v);
+    });
   }
 
   Future<void> _loadBestScores() async {
@@ -103,9 +109,80 @@ class _StartScreenState extends State<StartScreen> {
                   ),
                 ),
               ),
+              const SizedBox(height: 16),
+              _TeamPlayButton(
+                registered: _interestRegistered,
+                loading: _interestLoading,
+                onTap: () async {
+                  if (_interestRegistered || _interestLoading) return;
+                  setState(() => _interestLoading = true);
+                  await InterestService.register();
+                  if (mounted) {
+                    setState(() {
+                      _interestRegistered = true;
+                      _interestLoading = false;
+                    });
+                  }
+                },
+              ),
               const SizedBox(height: 32),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TeamPlayButton extends StatelessWidget {
+  final bool registered;
+  final bool loading;
+  final VoidCallback onTap;
+
+  const _TeamPlayButton({
+    required this.registered,
+    required this.loading,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        decoration: BoxDecoration(
+          color: registered ? const Color(0xFF0F3460).withValues(alpha: 0.6) : const Color(0xFF1A1A2E),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: registered ? Colors.greenAccent.withValues(alpha: 0.6) : const Color(0xFF3A3A5E),
+            width: registered ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (loading)
+              const SizedBox(
+                width: 16, height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white54),
+              )
+            else
+              Text(
+                registered ? '✓' : '🏆',
+                style: const TextStyle(fontSize: 16),
+              ),
+            const SizedBox(width: 10),
+            Text(
+              registered ? 'You\'re interested in Team Play!' : 'Team Play — coming soon, tap if interested',
+              style: TextStyle(
+                color: registered ? Colors.greenAccent.withValues(alpha: 0.8) : Colors.white38,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
         ),
       ),
     );
