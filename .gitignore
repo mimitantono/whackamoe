@@ -1,5 +1,6 @@
 # ── Credentials & signing ──────────────────────────────────────────────────────
 android/key.properties
+lib/config.dart
 *.jks
 *.keystore
 keystore.pass
