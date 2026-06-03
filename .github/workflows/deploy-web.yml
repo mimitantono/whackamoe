@@ -25,6 +25,15 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Create config.dart
+        run: |
+          cat > lib/config.dart << EOF
+          class Config {
+            static const supabaseUrl = '${{ secrets.SUPABASE_URL }}';
+            static const supabaseAnonKey = '${{ secrets.SUPABASE_ANON_KEY }}';
+          }
+          EOF
+
       - name: Install dependencies
         run: flutter pub get
 
