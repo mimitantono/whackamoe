@@ -199,12 +199,20 @@ class _NewHighScoreDialogState extends State<_NewHighScoreDialog> {
               child: TextField(
                 controller: _ctrl,
                 autofocus: true,
-                maxLength: 3,
                 textAlign: TextAlign.center,
                 textCapitalization: TextCapitalization.characters,
                 inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z0-9]')),
-                  LengthLimitingTextInputFormatter(3),
+                  TextInputFormatter.withFunction((_, newValue) {
+                    final filtered = newValue.text
+                        .toUpperCase()
+                        .replaceAll(RegExp(r'[^A-Z0-9]'), '');
+                    final clipped =
+                        filtered.length > 3 ? filtered.substring(0, 3) : filtered;
+                    return TextEditingValue(
+                      text: clipped,
+                      selection: TextSelection.collapsed(offset: clipped.length),
+                    );
+                  }),
                 ],
                 style: const TextStyle(
                   color: Color(0xFFFFD700),
