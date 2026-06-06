@@ -4,6 +4,8 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../leaderboard/leaderboard_service.dart';
+import '../leaderboard/new_high_score_dialog.dart';
 import '../models/difficulty.dart';
 import '../models/game_state.dart';
 import '../services/segmentation_service.dart';
@@ -170,7 +172,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         _spawnTimer?.cancel();
         for (final t in _holeTimers) { t?.cancel(); }
         _saveHighScore(_state.score);
-        WidgetsBinding.instance.addPostFrameCallback((_) => _showGameOver());
+        WidgetsBinding.instance.addPostFrameCallback((_) => _handleGameOver());
       } else {
         // Mole escaped — block this hole for a moment and signal the miss.
         _holeCoolingDown[index] = true;
@@ -249,9 +251,43 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         _spawnTimer?.cancel();
         for (final t in _holeTimers) { t?.cancel(); }
         _saveHighScore(_state.score);
-        WidgetsBinding.instance.addPostFrameCallback((_) => _showGameOver());
+        WidgetsBinding.instance.addPostFrameCallback((_) => _handleGameOver());
       }
     }
+  }
+
+  static const _nameKey = 'leaderboard_player_name';
+  static const _countryKey = 'leaderboard_country_code';
+
+  Future<void> _handleGameOver() async {
+    final score = _state.score;
+    final difficulty = widget.difficulty.name;
+    bool qualifies = false;
+    try {
+      qualifies = await LeaderboardService.qualifies(
+        gameId: 'whackamoe',
+        difficulty: difficulty,
+        score: score,
+      );
+    } catch (_) {}
+    if (!mounted) return;
+
+    if (qualifies) {
+      final prefs = await SharedPreferences.getInstance();
+      if (!mounted) return;
+      await showNewHighScoreDialog(
+        context,
+        gameId: 'whackamoe',
+        difficulty: difficulty,
+        score: score,
+        rememberedName: prefs.getString(_nameKey),
+        rememberedCountryCode: prefs.getString(_countryKey),
+        onNameRemembered: (n) => prefs.setString(_nameKey, n),
+        onCountryRemembered: (c) => prefs.setString(_countryKey, c),
+      );
+      if (!mounted) return;
+    }
+    _showGameOver();
   }
 
   void _showGameOver() {
