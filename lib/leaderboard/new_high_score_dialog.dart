@@ -1,9 +1,29 @@
+import 'dart:math';
 import 'package:country_picker/country_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'country_helper.dart';
 import 'leaderboard_service.dart';
+
+// {n} is replaced with the player's name.
+const _quips = [
+  'AWESOME, {n}!',
+  '{n}, you absolute legend.',
+  'A new champion: {n}.',
+  '{n}, immortalized.',
+  'Welcome to the hall of fame, {n}.',
+  '{n}, history will remember.',
+  '{n}, simply incredible.',
+  'Top tier work, {n}.',
+  '{n} just rewrote the rules.',
+  'The leaderboard fears you, {n}.',
+  '{n}, built different.',
+  'Bow down to {n}.',
+  'Cool name, {n}. Cooler score.',
+  '{n} has entered the chat.',
+  'Tell your friends, {n}. Or don\'t. Stay humble.',
+];
 
 /// Shows the retro 3-character name entry. Returns true if the score was
 /// submitted, false if the user dismissed.
@@ -61,6 +81,8 @@ class _NewHighScoreDialogState extends State<_NewHighScoreDialog> {
   late String? _countryCode;
   bool _submitting = false;
   String? _error;
+  String? _submittedName; // non-null = show celebration view
+  String? _quip;
 
   @override
   void initState() {
@@ -95,7 +117,14 @@ class _NewHighScoreDialogState extends State<_NewHighScoreDialog> {
       );
       widget.onNameRemembered?.call(name);
       if (_countryCode != null) widget.onCountryRemembered?.call(_countryCode!);
-      if (mounted) Navigator.of(context).pop(true);
+      if (mounted) {
+        final template = _quips[Random().nextInt(_quips.length)];
+        setState(() {
+          _submitting = false;
+          _submittedName = name;
+          _quip = template.replaceAll('{n}', name);
+        });
+      }
     } catch (e, st) {
       debugPrint('[Leaderboard] submit failed: $e\n$st');
       if (mounted) {
@@ -147,7 +176,76 @@ class _NewHighScoreDialogState extends State<_NewHighScoreDialog> {
         borderRadius: BorderRadius.circular(20),
         side: const BorderSide(color: Color(0xFFFFD700), width: 2),
       ),
-      child: Padding(
+      child: _submittedName != null ? _buildCelebration() : _buildEntry(flag),
+    );
+  }
+
+  Widget _buildCelebration() {
+    final flag = CountryHelper.toFlagEmoji(_countryCode) ?? '🏳️';
+    return Padding(
+      padding: const EdgeInsets.all(28),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('🏆', style: TextStyle(fontSize: 64)),
+          const SizedBox(height: 16),
+          Text(
+            _quip ?? '',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Color(0xFFFFD700),
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              height: 1.3,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(flag, style: const TextStyle(fontSize: 22)),
+              const SizedBox(width: 8),
+              Text(
+                _submittedName!,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 36,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'monospace',
+                  letterSpacing: 8,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '${widget.score}',
+                style: const TextStyle(
+                  color: Colors.white54,
+                  fontSize: 20,
+                  fontFamily: 'monospace',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFFD700),
+              foregroundColor: Colors.black,
+              padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 12),
+            ),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text(
+              'NICE',
+              style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 3),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEntry(String flag) {
+    return Padding(
         padding: const EdgeInsets.all(28),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -265,7 +363,7 @@ class _NewHighScoreDialogState extends State<_NewHighScoreDialog> {
             ),
           ],
         ),
-      ),
     );
   }
 }
+
